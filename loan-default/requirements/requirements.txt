@@ -2,3 +2,6 @@ numpy
 pandas
 scikit-learn
 mlflow
+
+dvc==3.55.2
+dvc-s3==3.2.0

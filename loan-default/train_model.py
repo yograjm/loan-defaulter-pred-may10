@@ -44,3 +44,105 @@ joblib.dump(rf_model, 'trained_model/rf_model_loan_default_pred.pkl')
 # Save Label encoder
 joblib.dump(loan_intent_encoder, 'trained_model/loan_intent_encoder.pkl')
 
+
+############# MLflow related code START #######################
+import mlflow
+
+# Set the tracking URI to the server
+from custom_utils import mlflow_tracking_url
+mlflow.set_tracking_uri(mlflow_tracking_url)
+
+# Set an experiment name, unique and case-sensitive
+# It will create a new experiment if the experiment with given doesn't exist
+exp = mlflow.set_experiment(experiment_name = "Loan-Defaulter-Pred")
+
+# MlflowClient provides programmatic access to Tracking server
+client = mlflow.tracking.MlflowClient()
+
+# Start RUN
+mlflow.start_run(experiment_id= exp.experiment_id)        # experiment id under which to create the current run
+
+
+training_accuracy = rf_model.score(X_train, y_train)
+testing_accuracy = rf_model.score(X_test, y_test)
+training_accuracy, testing_accuracy
+
+
+# Log hyperparameters
+mlflow.log_param("n_estimators", n_estimators)
+mlflow.log_param("max_depth", max_depth)
+mlflow.log_param("max_features", max_features)
+mlflow.log_param("random_state", random_state)
+
+# Log performance metrics
+mlflow.log_metric("training_accuracy", training_accuracy)
+mlflow.log_metric("testing_accuracy", testing_accuracy)
+
+# Log loan_intent_encoder as an artifact
+mlflow.log_artifact("trained_model/loan_intent_encoder.pkl", artifact_path="label_encoder")
+
+
+
+# Log model
+
+# Load current 'production' model via 'models'
+import mlflow.pyfunc
+
+from custom_utils import mlflow_model_name
+model_name = mlflow_model_name
+
+
+try:
+    # Capture the test-accuracy-score of the existing prod-model
+    prod_model_info = client.get_model_version_by_alias(name=model_name, alias="production")         # 1fetch prod-model info
+    prod_model_run_id = prod_model_info.run_id                   # run_id of the run associated with prod-model
+    prod_run = client.get_run(run_id=prod_model_run_id)          # get run info using run_id
+    prod_accuracy = prod_run.data.metrics['testing_accuracy']    # get metrics values
+
+    # Capture the version of the last-trained model
+    latest_model_info = client.get_model_version_by_alias(name=model_name, alias="last-trained")           # fetch latest-model info
+    latest_model_version = int(latest_model_info.version)              # latest-model version
+    new_version = latest_model_version + 1                      # new model version
+
+except Exception as e:
+    print(e)
+    new_version = 1
+
+
+# Criterion to Log trained model
+if new_version > 1:
+    if prod_accuracy < testing_accuracy:
+        print("Trained model is better than the existing model in production, will use this model in production!")
+        better_model = True
+    else:
+        print("Trained model is not better than the existing model in production!")
+        better_model = False
+    first_model = False
+else:
+    print("No existing model in production, registering a new model!")
+    first_model = True
+
+
+# Register new model/version of model
+mlflow.sklearn.log_model(sk_model = rf_model, 
+                        artifact_path="trained_model",
+                        registered_model_name=model_name,
+                        )
+
+# Add 'last-trained' alias to this new model version
+client.set_registered_model_alias(name=model_name, alias="last-trained", version=str(new_version))
+
+
+if first_model or better_model:
+    # Promote the model to production by adding 'production' alias to this new model version
+    client.set_registered_model_alias(name=model_name, alias="production", version=str(new_version))
+else:
+    # Don't promote this new model version
+    pass
+
+
+
+# End an active MLflow run
+mlflow.end_run()
+
+############# MLflow related code END #######################

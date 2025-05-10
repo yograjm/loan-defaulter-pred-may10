@@ -1,7 +1,38 @@
 import numpy as np
 import pandas as pd
 
-df = pd.read_csv("dataset/credit_risk_dataset.csv")
+# df = pd.read_csv("dataset/credit_risk_dataset.csv")
+
+
+############ DVC related code START ###################
+
+import os
+
+
+import dvc.api
+import pandas as pd
+
+# Repo:  'https://<github-username>:<github-token>@github.com/yograjm/credit-risk-data'
+
+repo_name = "loan-data-repo"     # Change as per your GitHub repository name
+repo_url = 'https://' + os.environ['GH_USERNAME'] + ':' + os.environ['GH_ACCESS_TOKEN'] + '@github.com/' + os.environ['GH_USERNAME'] + '/' + repo_name
+
+
+data_revision = 'v1.1'
+
+# Configurations to access remote storage
+remote_config = {
+    'access_key_id': os.environ["AWS_ACCESS_KEY_ID"],
+    'secret_access_key': os.environ["AWS_SECRET_ACCESS_KEY"],
+}
+
+with dvc.api.open('data/credit_risk_dataset.csv', repo=repo_url, rev=data_revision, remote_config=remote_config) as file:
+    df = pd.read_csv(file)
+
+#df.tail()
+
+############ DVC related code END ###################
+
 
 # Handle missing values
 df['loan_int_rate'] = df['loan_int_rate'].fillna(df['loan_int_rate'].mean())
@@ -9,9 +40,7 @@ df['person_emp_length'] = df['person_emp_length'].fillna(df['person_emp_length']
 
 
 # Handle categorical columns
-home_ownership_mapping = {'MORTGAGE': 0, 'RENT': 1, 'OWN': 2, 'OTHER': 3}
-loan_grade_mapping = {'A': 0, 'B': 1, 'C': 2, 'D': 3, 'E': 4, 'F': 5, 'G': 6}
-default_on_file_mapping = {'N': 0, 'Y': 1}
+from custom_utils import loan_grade_mapping, home_ownership_mapping, default_on_file_mapping
 
 df['person_home_ownership'] = df['person_home_ownership'].map(home_ownership_mapping)
 df['loan_grade'] = df['loan_grade'].map(loan_grade_mapping)

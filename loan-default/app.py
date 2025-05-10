@@ -4,7 +4,7 @@ import gradio
 import gradio as gr
 import pandas as pd
 
-from data_preprocessing import loan_grade_mapping, home_ownership_mapping, default_on_file_mapping
+from custom_utils import loan_grade_mapping, home_ownership_mapping, default_on_file_mapping
 
 from predict import loan_intent_encoder, make_prediction
 
@@ -55,5 +55,5 @@ iface = gr.Interface(fn=predict_loan_status,
 
 if __name__ == "__main__":
     # Launch interface
-    iface.launch(debug=True)
+    iface.launch(server_name="0.0.0.0", server_port=7860)
 

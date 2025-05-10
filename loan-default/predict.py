@@ -1,13 +1,52 @@
 
 import pandas as pd
-from data_preprocessing import loan_grade_mapping, home_ownership_mapping, default_on_file_mapping
+from custom_utils import loan_grade_mapping, home_ownership_mapping, default_on_file_mapping
 
 # To load model
 import joblib
-rf_model = joblib.load("trained_model/rf_model_loan_default_pred.pkl")
-loan_intent_encoder = joblib.load("trained_model/loan_intent_encoder.pkl")
+#rf_model = joblib.load("trained_model/rf_model_loan_default_pred.pkl")
+#loan_intent_encoder = joblib.load("trained_model/loan_intent_encoder.pkl")
 
 # model.predict(sample_input_df)
+
+######## Load Model from MLflow ######################
+import mlflow
+import mlflow.pyfunc
+
+# Set tracking uri
+from custom_utils import mlflow_tracking_url
+mlflow.set_tracking_uri(mlflow_tracking_url)
+
+# Create MLflow client
+client = mlflow.tracking.MlflowClient()
+
+## Load model
+from custom_utils import mlflow_model_name
+model_name = mlflow_model_name
+
+rf_model = mlflow.pyfunc.load_model(model_uri=f"models:/{model_name}@production")
+model_info = client.get_model_version_by_alias(name=model_name, alias="production")
+
+print(f'Model version fetched: {model_info.version}')
+
+## Load label_encoder
+
+# Run ID
+run_id = model_info.run_id
+
+# Download artifact path
+artifact_path = "label_encoder/loan_intent_encoder.pkl"
+
+# Download artifact to a local path
+local_path = mlflow.artifacts.download_artifacts(run_id=run_id, artifact_path=artifact_path)
+# print(local_path)
+
+# Load the encoder using joblib or pickle
+import joblib
+loan_intent_encoder = joblib.load(local_path)
+
+######## END ######################
+
 
 # Inference
 sample_input = {'person_age': 22,
