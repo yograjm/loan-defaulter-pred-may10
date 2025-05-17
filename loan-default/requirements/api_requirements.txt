@@ -4,3 +4,7 @@ gradio
 
 fastapi
 uvicorn
+
+prometheus-client
+
+psycopg2
